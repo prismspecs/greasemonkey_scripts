@@ -138,6 +138,16 @@
         }
     });
 
+    // Toggle the cycling on "K" key press
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'k' || event.key === 'K') {
+            if (cycling) {
+                stopCycling();
+            } else {
+                startCycling();
+            }
+        }
+    });
 
     // Use MutationObserver to wait for the page to load necessary elements
     const observer = new MutationObserver((mutations, obs) => {
