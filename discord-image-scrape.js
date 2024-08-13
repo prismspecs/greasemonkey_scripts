@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Discord Super Overlay Image Cycler
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.2
 // @description  Cycle through images from divs with classes starting with "imageContainer" and display them in an overlay on Discord. Scroll up in divs with classes starting with "scroller" every second. Maintain a global list of image URLs, avoid duplicates, and display images in reverse order. Log new images to the console.
 // @author       Your Name
 // @match        https://discord.com/channels/*
@@ -12,8 +12,8 @@
     'use strict';
 
     const imageDuration = 100; // Duration for image cycling in milliseconds
-    const scrollDuration = 1000; // Duration for scrolling in milliseconds
-    const scrollUpAmount = 200; // Amount to scroll up each time
+    const scrollDuration = 500; // Duration for scrolling in milliseconds
+    const scrollUpAmount = 2000; // Amount to scroll up each time
 
     let globalImages = new Set(); // Use a Set to maintain a unique list of image URLs
 
@@ -102,7 +102,7 @@
     // Function to scroll up in divs with classes starting with "scroller"
     function scrollUpInScrollerDivs() {
         document.querySelectorAll('div[class^="scroller"]').forEach(div => {
-            div.scrollTop = (div.scrollTop - scrollUpAmount) % div.scrollHeight; // Adjust scroll amount and wrap around
+            div.scrollTop = (div.scrollTop - scrollUpAmount + div.scrollHeight) % div.scrollHeight; // Adjust scroll amount and wrap around
         });
     }
 
@@ -115,7 +115,10 @@
         }
         superOverlay.style.display = 'flex';
         intervalId = setInterval(cycleImages, imageDuration); 
-        scrollIntervalId = setInterval(scrollUpInScrollerDivs, scrollDuration);
+        scrollIntervalId = setInterval(() => {
+            scrollUpInScrollerDivs();
+            collectImages(); // Collect new images after scrolling
+        }, scrollDuration);
         cycling = true;
         button.textContent = 'Stop Cycling';
     }
@@ -149,13 +152,12 @@
         }
     });
 
-    // Use MutationObserver to wait for the page to load necessary elements
-    const observer = new MutationObserver((mutations, obs) => {
-        // Optionally update style or other elements here
-        // observer.disconnect(); // Stop observing if desired
+    // Use MutationObserver to detect changes in the DOM and collect images
+    const observer = new MutationObserver(() => {
+        collectImages(); // Collect images when changes occur in the DOM
     });
 
-    observer.observe(document, {
+    observer.observe(document.body, {
         childList: true,
         subtree: true
     });
