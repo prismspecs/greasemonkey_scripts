@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Discord Super Overlay Image Cycler
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  Cycle through images from divs with classes starting with "imageContainer" and display them in an overlay on Discord.
+// @version      2.0
+// @description  Cycle through images from divs with classes starting with "imageContainer" and display them in an overlay on Discord. Scroll up in divs with classes starting with "scroller" every second. Maintain a global list of image URLs, avoid duplicates, and display images in reverse order. Log new images to the console.
 // @author       Your Name
 // @match        https://discord.com/channels/*
 // @grant        none
@@ -10,6 +10,12 @@
 
 (function() {
     'use strict';
+
+    const imageDuration = 100; // Duration for image cycling in milliseconds
+    const scrollDuration = 1000; // Duration for scrolling in milliseconds
+    const scrollUpAmount = 200; // Amount to scroll up each time
+
+    let globalImages = new Set(); // Use a Set to maintain a unique list of image URLs
 
     // Create the button element
     var button = document.createElement('button');
@@ -23,6 +29,7 @@
     button.style.border = 'none'; // Remove default border
     button.style.cursor = 'pointer'; // Change cursor on hover
     button.style.zIndex = '10000'; // Make sure the button is on top of other elements
+    button.style.borderRadius = '5px'; // Rounded corners for button
 
     // Append the button to the body
     document.body.appendChild(button);
@@ -30,6 +37,7 @@
     let cycling = false;
     let intervalId;
     let overlayImage;
+    let scrollIntervalId;
 
     // Create the superoverlay div
     const superOverlay = document.createElement('div');
@@ -68,20 +76,21 @@
 
     // Function to collect images from divs with classes starting with "imageContainer"
     function collectImages() {
-        const images = [];
         document.querySelectorAll('div[class^="imageContainer"]').forEach(container => {
             container.querySelectorAll('img').forEach(img => {
                 let fullResUrl = cleanImageUrl(img.src);
-                images.push(fullResUrl);
+                if (!globalImages.has(fullResUrl)) {
+                    globalImages.add(fullResUrl); // Add image to the global set
+                    console.log('New image added:', fullResUrl); // Log the new image URL
+                }
             });
         });
-        return images;
     }
 
-    // Function to cycle through images
+    // Function to cycle through images from the global list in reverse order
     let index = 0;
     function cycleImages() {
-        const images = collectImages();
+        const images = Array.from(globalImages).reverse(); // Convert set to array and reverse it
         if (images.length === 0) {
             superOverlay.innerHTML = '<p>No images found</p>';
             return;
@@ -90,22 +99,31 @@
         index = (index + 1) % images.length;
     }
 
-    // Function to start the image cycling
+    // Function to scroll up in divs with classes starting with "scroller"
+    function scrollUpInScrollerDivs() {
+        document.querySelectorAll('div[class^="scroller"]').forEach(div => {
+            div.scrollTop = (div.scrollTop - scrollUpAmount) % div.scrollHeight; // Adjust scroll amount and wrap around
+        });
+    }
+
+    // Function to start the image cycling and scrolling
     function startCycling() {
-        const images = collectImages();
-        if (images.length === 0) {
+        collectImages(); // Collect images from the start
+        if (globalImages.size === 0) {
             superOverlay.innerHTML = '<p>No images found</p>';
             return;
         }
         superOverlay.style.display = 'flex';
-        intervalId = setInterval(cycleImages, 1000); // 1 second per image
+        intervalId = setInterval(cycleImages, imageDuration); 
+        scrollIntervalId = setInterval(scrollUpInScrollerDivs, scrollDuration);
         cycling = true;
         button.textContent = 'Stop Cycling';
     }
 
-    // Function to stop the image cycling
+    // Function to stop the image cycling and scrolling
     function stopCycling() {
         clearInterval(intervalId);
+        clearInterval(scrollIntervalId);
         superOverlay.style.display = 'none';
         cycling = false;
         button.textContent = 'Start Cycling';
@@ -120,16 +138,6 @@
         }
     });
 
-    // Toggle the cycling on "K" key press
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'k' || event.key === 'K') {
-            if (cycling) {
-                stopCycling();
-            } else {
-                startCycling();
-            }
-        }
-    });
 
     // Use MutationObserver to wait for the page to load necessary elements
     const observer = new MutationObserver((mutations, obs) => {
