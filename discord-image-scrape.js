@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Discord Super Overlay Image Cycler
 // @namespace    http://tampermonkey.net/
-// @version      2.2
-// @description  Cycle through images from divs with classes starting with "imageContainer" and display them in an overlay on Discord. Scroll up in divs with classes starting with "scroller" every second. Maintain a global list of image URLs, avoid duplicates, and display images in reverse order. Log new images to the console.
+// @version      2.3
+// @description  Collect images from divs with classes starting with "imageContainer" and display them in an overlay on Discord. Scroll up in divs with classes starting with "scroller" every second. Maintain a global list of image URLs, avoid duplicates, and display images in reverse order. Log new images to the console.
 // @author       Your Name
 // @match        https://discord.com/channels/*
 // @grant        none
@@ -11,33 +11,48 @@
 (function() {
     'use strict';
 
-    const imageDuration = 100; // Duration for image cycling in milliseconds
-    const scrollDuration = 500; // Duration for scrolling in milliseconds
+    const imageDuration = 50; // Duration for image cycling in milliseconds
+    const scrollDuration = 200; // Duration for scrolling in milliseconds
     const scrollUpAmount = 2000; // Amount to scroll up each time
 
     let globalImages = new Set(); // Use a Set to maintain a unique list of image URLs
-
-    // Create the button element
-    var button = document.createElement('button');
-    button.textContent = 'Start Cycling';
-    button.style.position = 'fixed'; // Use 'fixed' to position relative to the viewport
-    button.style.right = '10px'; // Position 10 pixels from the right
-    button.style.bottom = '10px'; // Position 10 pixels from the bottom
-    button.style.padding = '10px 20px'; // Add some padding to make it look better
-    button.style.backgroundColor = '#007bff'; // Button background color
-    button.style.color = '#fff'; // Button text color
-    button.style.border = 'none'; // Remove default border
-    button.style.cursor = 'pointer'; // Change cursor on hover
-    button.style.zIndex = '10000'; // Make sure the button is on top of other elements
-    button.style.borderRadius = '5px'; // Rounded corners for button
-
-    // Append the button to the body
-    document.body.appendChild(button);
-
-    let cycling = false;
-    let intervalId;
+    let collecting = false;
+    let displaying = false;
+    let collectIntervalId;
+    let displayIntervalId;
     let overlayImage;
-    let scrollIntervalId;
+
+    // Create the start/stop collection button
+    var collectButton = document.createElement('button');
+    collectButton.textContent = 'Start Collection';
+    collectButton.style.position = 'fixed'; 
+    collectButton.style.right = '10px'; 
+    collectButton.style.bottom = '50px'; 
+    collectButton.style.padding = '10px 20px'; 
+    collectButton.style.backgroundColor = '#007bff'; 
+    collectButton.style.color = '#fff'; 
+    collectButton.style.border = 'none'; 
+    collectButton.style.cursor = 'pointer'; 
+    collectButton.style.zIndex = '10000'; 
+    collectButton.style.borderRadius = '5px'; 
+
+    // Create the start/stop display button
+    var displayButton = document.createElement('button');
+    displayButton.textContent = 'Start Display';
+    displayButton.style.position = 'fixed'; 
+    displayButton.style.right = '10px'; 
+    displayButton.style.bottom = '10px'; 
+    displayButton.style.padding = '10px 20px'; 
+    displayButton.style.backgroundColor = '#007bff'; 
+    displayButton.style.color = '#fff'; 
+    displayButton.style.border = 'none'; 
+    displayButton.style.cursor = 'pointer'; 
+    displayButton.style.zIndex = '10000'; 
+    displayButton.style.borderRadius = '5px'; 
+
+    // Append the buttons to the body
+    document.body.appendChild(collectButton);
+    document.body.appendChild(displayButton);
 
     // Create the superoverlay div
     const superOverlay = document.createElement('div');
@@ -64,12 +79,10 @@
     // Function to clean up image URLs by removing specific parameters and adding format=jpeg
     function cleanImageUrl(url) {
         const urlObj = new URL(url);
-        // Remove unwanted parameters
         urlObj.searchParams.delete('width');
         urlObj.searchParams.delete('height');
         urlObj.searchParams.delete('quality');
         urlObj.searchParams.delete('format');
-        // Add format=jpeg
         urlObj.searchParams.set('format', 'jpeg');
         return urlObj.toString();
     }
@@ -87,16 +100,49 @@
         });
     }
 
-    // Function to cycle through images from the global list in reverse order
-    let index = 0;
-    function cycleImages() {
-        const images = Array.from(globalImages).reverse(); // Convert set to array and reverse it
-        if (images.length === 0) {
+    // Function to start image collection
+    function startCollecting() {
+        collectImages(); // Initial collection
+        collectIntervalId = setInterval(() => {
+            scrollUpInScrollerDivs();
+            collectImages(); // Collect new images after scrolling
+        }, scrollDuration);
+        collecting = true;
+        collectButton.textContent = 'Stop Collection';
+    }
+
+    // Function to stop image collection
+    function stopCollecting() {
+        clearInterval(collectIntervalId);
+        collecting = false;
+        collectButton.textContent = 'Start Collection';
+    }
+
+    // Function to start image display
+    let displayIndex = 0;
+    function startDisplaying() {
+        if (globalImages.size === 0) {
             superOverlay.innerHTML = '<p>No images found</p>';
             return;
         }
-        overlayImage.src = images[index];
-        index = (index + 1) % images.length;
+        superOverlay.style.display = 'flex';
+        displayIntervalId = setInterval(() => {
+            const images = Array.from(globalImages).reverse(); // Convert set to array and reverse it
+            if (images.length > 0) {
+                overlayImage.src = images[displayIndex];
+                displayIndex = (displayIndex + 1) % images.length;
+            }
+        }, imageDuration);
+        displaying = true;
+        displayButton.textContent = 'Stop Display';
+    }
+
+    // Function to stop image display
+    function stopDisplaying() {
+        clearInterval(displayIntervalId);
+        superOverlay.style.display = 'none';
+        displaying = false;
+        displayButton.textContent = 'Start Display';
     }
 
     // Function to scroll up in divs with classes starting with "scroller"
@@ -106,55 +152,26 @@
         });
     }
 
-    // Function to start the image cycling and scrolling
-    function startCycling() {
-        collectImages(); // Collect images from the start
-        if (globalImages.size === 0) {
-            superOverlay.innerHTML = '<p>No images found</p>';
-            return;
-        }
-        superOverlay.style.display = 'flex';
-        intervalId = setInterval(cycleImages, imageDuration); 
-        scrollIntervalId = setInterval(() => {
-            scrollUpInScrollerDivs();
-            collectImages(); // Collect new images after scrolling
-        }, scrollDuration);
-        cycling = true;
-        button.textContent = 'Stop Cycling';
-    }
-
-    // Function to stop the image cycling and scrolling
-    function stopCycling() {
-        clearInterval(intervalId);
-        clearInterval(scrollIntervalId);
-        superOverlay.style.display = 'none';
-        cycling = false;
-        button.textContent = 'Start Cycling';
-    }
-
-    // Toggle the cycling on button click
-    button.addEventListener('click', () => {
-        if (cycling) {
-            stopCycling();
+    // Event listeners for the buttons
+    collectButton.addEventListener('click', () => {
+        if (collecting) {
+            stopCollecting();
         } else {
-            startCycling();
+            startCollecting();
         }
     });
 
-    // Toggle the cycling on "K" key press
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'k' || event.key === 'K') {
-            if (cycling) {
-                stopCycling();
-            } else {
-                startCycling();
-            }
+    displayButton.addEventListener('click', () => {
+        if (displaying) {
+            stopDisplaying();
+        } else {
+            startDisplaying();
         }
     });
 
     // Use MutationObserver to detect changes in the DOM and collect images
     const observer = new MutationObserver(() => {
-        collectImages(); // Collect images when changes occur in the DOM
+        if (collecting) collectImages(); // Collect images when changes occur if collecting is active
     });
 
     observer.observe(document.body, {
