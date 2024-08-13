@@ -1,0 +1,144 @@
+// ==UserScript==
+// @name         Discord Super Overlay Image Cycler
+// @namespace    http://tampermonkey.net/
+// @version      1.4
+// @description  Cycle through images from divs with classes starting with "imageContainer" and display them in an overlay on Discord.
+// @author       Your Name
+// @match        https://discord.com/channels/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Create the button element
+    var button = document.createElement('button');
+    button.textContent = 'Start Cycling';
+    button.style.position = 'fixed'; // Use 'fixed' to position relative to the viewport
+    button.style.right = '10px'; // Position 10 pixels from the right
+    button.style.bottom = '10px'; // Position 10 pixels from the bottom
+    button.style.padding = '10px 20px'; // Add some padding to make it look better
+    button.style.backgroundColor = '#007bff'; // Button background color
+    button.style.color = '#fff'; // Button text color
+    button.style.border = 'none'; // Remove default border
+    button.style.cursor = 'pointer'; // Change cursor on hover
+    button.style.zIndex = '10000'; // Make sure the button is on top of other elements
+
+    // Append the button to the body
+    document.body.appendChild(button);
+
+    let cycling = false;
+    let intervalId;
+    let overlayImage;
+
+    // Create the superoverlay div
+    const superOverlay = document.createElement('div');
+    superOverlay.id = 'superoverlay';
+    superOverlay.style.position = 'fixed';
+    superOverlay.style.top = '0';
+    superOverlay.style.left = '0';
+    superOverlay.style.width = '100%';
+    superOverlay.style.height = '100%';
+    superOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    superOverlay.style.zIndex = '9999';
+    superOverlay.style.display = 'none'; // Hidden initially
+    superOverlay.style.alignItems = 'center';
+    superOverlay.style.justifyContent = 'center';
+    superOverlay.style.color = 'white'; // Color of the text in case no images are found
+    document.body.appendChild(superOverlay);
+
+    // Create an img element inside the superoverlay to display images
+    overlayImage = document.createElement('img');
+    overlayImage.style.maxWidth = '100%';
+    overlayImage.style.maxHeight = '100%';
+    superOverlay.appendChild(overlayImage);
+
+    // Function to clean up image URLs by removing specific parameters and adding format=jpeg
+    function cleanImageUrl(url) {
+        const urlObj = new URL(url);
+        // Remove unwanted parameters
+        urlObj.searchParams.delete('width');
+        urlObj.searchParams.delete('height');
+        urlObj.searchParams.delete('quality');
+        urlObj.searchParams.delete('format');
+        // Add format=jpeg
+        urlObj.searchParams.set('format', 'jpeg');
+        return urlObj.toString();
+    }
+
+    // Function to collect images from divs with classes starting with "imageContainer"
+    function collectImages() {
+        const images = [];
+        document.querySelectorAll('div[class^="imageContainer"]').forEach(container => {
+            container.querySelectorAll('img').forEach(img => {
+                let fullResUrl = cleanImageUrl(img.src);
+                images.push(fullResUrl);
+            });
+        });
+        return images;
+    }
+
+    // Function to cycle through images
+    let index = 0;
+    function cycleImages() {
+        const images = collectImages();
+        if (images.length === 0) {
+            superOverlay.innerHTML = '<p>No images found</p>';
+            return;
+        }
+        overlayImage.src = images[index];
+        index = (index + 1) % images.length;
+    }
+
+    // Function to start the image cycling
+    function startCycling() {
+        const images = collectImages();
+        if (images.length === 0) {
+            superOverlay.innerHTML = '<p>No images found</p>';
+            return;
+        }
+        superOverlay.style.display = 'flex';
+        intervalId = setInterval(cycleImages, 1000); // 1 second per image
+        cycling = true;
+        button.textContent = 'Stop Cycling';
+    }
+
+    // Function to stop the image cycling
+    function stopCycling() {
+        clearInterval(intervalId);
+        superOverlay.style.display = 'none';
+        cycling = false;
+        button.textContent = 'Start Cycling';
+    }
+
+    // Toggle the cycling on button click
+    button.addEventListener('click', () => {
+        if (cycling) {
+            stopCycling();
+        } else {
+            startCycling();
+        }
+    });
+
+    // Toggle the cycling on "K" key press
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'k' || event.key === 'K') {
+            if (cycling) {
+                stopCycling();
+            } else {
+                startCycling();
+            }
+        }
+    });
+
+    // Use MutationObserver to wait for the page to load necessary elements
+    const observer = new MutationObserver((mutations, obs) => {
+        // Optionally update style or other elements here
+        // observer.disconnect(); // Stop observing if desired
+    });
+
+    observer.observe(document, {
+        childList: true,
+        subtree: true
+    });
+})();
