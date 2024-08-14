@@ -105,33 +105,33 @@
     }
 
     // Function to collect images from divs with classes starting with "imageContainer"
-    function collectImages() {
-        console.log('Collecting images...'); // Debug log
-        document.querySelectorAll('div[class^="imageContainer"]').forEach(container => {
-            // Traverse up to the parent LI element
-            const parentLi = container.closest('li');
-            if (parentLi) {
-                // Check if the parent LI contains a DIV with "U1" text
-                const containsText = Array.from(parentLi.querySelectorAll('div')).some(div => div.textContent.includes('U1'));
+function collectImages() {
+    console.log('Collecting images...'); // Debug log
+    document.querySelectorAll('div[class^="imageContainer"]').forEach(container => {
+        // Traverse up to the parent LI element
+        const parentLi = container.closest('li');
+        if (parentLi) {
+            // Check if the parent LI contains a DIV with "U1" text
+            const containsText = Array.from(parentLi.querySelectorAll('div')).some(div => div.textContent.includes('U1'));
 
-                // Proceed based on whether to ignore image grids or not
-                if (!ignoreImageGrids || !containsText) {
-                    container.querySelectorAll('img').forEach(img => {
-                        // Skip base64-encoded images
-                        if (img.src.startsWith('data:image/')) {
-                            return;
-                        }
+            // Proceed based on whether to ignore image grids or not
+            if (!ignoreImageGrids || !containsText) {
+                container.querySelectorAll('img').forEach(img => {
+                    // Skip base64-encoded images
+                    if (img.src.startsWith('data:image/')) {
+                        return;
+                    }
 
-                        let fullResUrl = cleanImageUrl(img.src);
-                        if (!globalImages.has(fullResUrl)) {
-                            globalImages.add(fullResUrl); // Add image to the global set
-                            console.log('New image added:', fullResUrl); // Log the new image URL
-                        }
-                    });
-                }
+                    let fullResUrl = cleanImageUrl(img.src);
+                    if (!globalImages.has(fullResUrl)) {
+                        globalImages.add(fullResUrl); // Add image to the global set
+                        console.log('New image added:', fullResUrl); // Log the new image URL
+                    }
+                });
             }
-        });
-    }
+        }
+    });
+}
 
 
     // Function to start image collection
